@@ -81,7 +81,7 @@ And add this new section:
   resources: ["ingresses"]
 ```
 
-That change will allow the Kubernetes Agent to create Service and Ingress resources
+Those changes will allow the Kubernetes Agent to create Service and Ingress resources
 
 The updated rules section in the Role resource should look like this:
 

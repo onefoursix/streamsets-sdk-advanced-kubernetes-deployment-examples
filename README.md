@@ -56,7 +56,7 @@ I added a record to my DNS to map the name <code>aks.onefoursix.com</code> to th
 	Address: 20.69.83.54
 
 ### Store a TLS key and cert for the Load Balancer in a Secret
-I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files tls.crt and tls.key respectively. Store the TLS key and cert in a Kubernetes Secret:
+I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files <code>tls.crt</code> and <code>tls.key</code> respectively. Store the TLS key and cert in a Kubernetes Secret:
 
 	$ kubectl create secret tls streamsets-tls \
     	--key ~/certs/tls.key --cert ~/certs/tls.crt

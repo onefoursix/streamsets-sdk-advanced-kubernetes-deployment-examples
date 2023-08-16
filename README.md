@@ -214,13 +214,12 @@ SDC Suffix: sdc1
 ```
 
 #### Inspect the Deployment
-You should see a new Deployment in Control Hub in a Deactivated state.  
+You should see a new Deployment in Control Hub in a Deactivated state.  (You can uncomment the second to last line in the Python script to have Deployments autostart once you have confidence in the process.)
 
 <img src="images/deployment.png" alt="deployment" width="700"/>
 
-
-Note that you can uncomment the second to last line in the Python script to have Deployments autostart once you have confidence in the process.
-
 Inspect the stage libraries, labels, and all other configuration to confirm the Deployment was created as desired.  When editing the Deployment you should be placed in the Advanced Kubernetes pane:
+
+<img src="images/advanced.png" alt="advanced" width="700"/>
 
 

@@ -218,8 +218,25 @@ You should see a new Deployment in Control Hub in a Deactivated state.  (You can
 
 <img src="images/deployment.png" alt="deployment" width="700"/>
 
-Inspect the stage libraries, labels, and all other configuration to confirm the Deployment was created as desired.  When editing the Deployment you should be placed in the Advanced Kubernetes pane:
+Inspect the stage libraries, labels, and all other configuration to confirm the Deployment was created as desired.  
+
+When editing the Deployment you should be placed in the Advanced Kubernetes pane and you can inspect the generated manifest, including the Service and Ingress:
 
 <img src="images/advanced.png" alt="advanced" width="700"/>
+
+### Start the Deployment
+
+Start the Deployment and it should transition to Activating and then to Active:
+
+<img src="images/active.png" alt="active" width="700"/>
+
+The Engine should register with Control Hub with its path-based URL:
+
+<img src="images/engine.png" alt="engine" width="700"/>
+
+The Data Collector should be accessible for Authoring:
+
+<img src="images/accessible.png" alt="accessible" width="700"/>
+
 
 

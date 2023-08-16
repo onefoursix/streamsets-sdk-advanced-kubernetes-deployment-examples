@@ -34,10 +34,6 @@ Create a namespace for the StreamSets Deployment:
 
 <code>$ kubectl create ns ns1</code>
 
-Make that namespace the default:
-
-<code>$ kubectl config set-context --current --namespace ns1</code>
-
 ### Deploy the Ingress Controller
 I installed ingress-nginx v1.6.4 on AKS using the command:
 
@@ -61,7 +57,7 @@ I added a record to my DNS to map the name <code>aks.onefoursix.com</code> to th
 ### Store a TLS key and cert for the Load Balancer in a Secret
 I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files <code>tls.crt</code> and <code>tls.key</code> respectively. Store the TLS key and cert in a Kubernetes Secret:
 
-	$ kubectl create secret tls streamsets-tls \
+	$ kubectl -n ns1 create secret tls streamsets-tls \
     	--key ~/certs/tls.key --cert ~/certs/tls.crt
 
 

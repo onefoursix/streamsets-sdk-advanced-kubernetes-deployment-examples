@@ -46,7 +46,29 @@ I installed ingress-nginx v1.6.4 on AKS using the command:
 
 ### Get the External IP for the Ingress Controller's Load Balancer Service
 
-<img src="images/external-ip.png" alt="pipeline" width="800"/>
+<img src="images/external-ip.png" alt="external-ip" width="800"/>
+
+### Map a DNS Name to the Load Balancer's IP
+I added a record to my DNS to map the name <code>aks.onefoursix.com</code> to the Load Balancer's external IP, and confirm that using nslookup:
+
+	$  nslookup aks.onefoursix.com
+	Server:	8.8.8.8
+	Address:	8.8.8.8#53
+
+	Non-authoritative answer:
+	Name:	aks.onefoursix.com
+	Address: 20.69.83.54
+
+### Store a TLS key and cert for the Load Balancer in a Secret
+I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files tls.crt and tls.key respectively. Store the TLS key and cert in a Kubernetes Secret:
+
+	$ kubectl create secret tls streamsets-tls \
+    	--key ~/certs/tls.key --cert ~/certs/tls.crt
 
 
+### Create a Kubernetes Environment
+
+I'll create a new Kubernetes Environment named aks-ns1:
+
+<img src="images/env-1.png" alt="env-1" width="800"/>
 

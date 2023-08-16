@@ -179,7 +179,7 @@ Set your [API credentials] in the file <code>private/sdk-env.sh</code> as quoted
 	export CRED_TOKEN="eyJ0…………J9."
 
 ### Deploy a single SDC
-Make the file <code>create-k8s-deployment.sh</code> executable:
+Make the script <code>create-k8s-deployment.sh</code> executable:
 
 	$ chmod +x create-k8s-deployment.sh
 
@@ -238,5 +238,96 @@ The Data Collector should be accessible for Authoring:
 
 <img src="images/accessible.png" alt="accessible" width="700"/>
 
+### Create multiple deployments
+Make the script <code>create-multiple-k8s-deployments.sh</code> executable: 
 
+	$ chmod +x create-multiple-k8s-deployments.sh
+
+Execute the script, passing it two args: the name of your StreamSets Kubernetes Environment, and a comma-delimited list of Deployment suffixes.  For example:
+
+	$ ./create-multiple-k8s-deployments.sh aks-ns1 sdc1,sdc2,sdc3
+
+If all goes well you should see console output like this:
+
+```
+$ ./create-multiple-k8s-deployments.sh aks-ns1 sdc1,sdc2,sdc3
+---------
+Creating StreamSets Deployments
+Environment Name aks-ns1
+Deployment Suffix List: sdc1,sdc2,sdc3
+---------
+
+---------
+Creating StreamSets Deployment
+Environment Name aks-ns1
+SDC Suffix: sdc1
+---------
+2023-08-15 21:12:40 Connecting to Control Hub
+2023-08-15 21:12:41 Getting the environment
+2023-08-15 21:12:41 Found environment aks-ns1
+2023-08-15 21:12:41 Getting the namespace
+2023-08-15 21:12:41 Using namespace ns1
+2023-08-15 21:12:41 Creating a deployment builder
+2023-08-15 21:12:41 Creating deployment aks-ns1-sdc1
+2023-08-15 21:12:43 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-15 21:12:43 Loading sdc.properties
+2023-08-15 21:12:43 Loading credential-stores.properties
+2023-08-15 21:12:43 Loading security.policy
+2023-08-15 21:12:43 Loading sdc-log4j2.properties
+2023-08-15 21:12:43 Loading proxy.properties
+2023-08-15 21:12:44 Using yaml template: yaml/sdc-service-ingress.yaml
+2023-08-15 21:12:44 Done
+---------
+Creating StreamSets Deployment
+Environment Name aks-ns1
+SDC Suffix: sdc2
+---------
+2023-08-15 21:12:44 Connecting to Control Hub
+2023-08-15 21:12:45 Getting the environment
+2023-08-15 21:12:45 Found environment aks-ns1
+2023-08-15 21:12:45 Getting the namespace
+2023-08-15 21:12:45 Using namespace ns1
+2023-08-15 21:12:45 Creating a deployment builder
+2023-08-15 21:12:45 Creating deployment aks-ns1-sdc2
+2023-08-15 21:12:47 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-15 21:12:47 Loading sdc.properties
+2023-08-15 21:12:47 Loading credential-stores.properties
+2023-08-15 21:12:47 Loading security.policy
+2023-08-15 21:12:47 Loading sdc-log4j2.properties
+2023-08-15 21:12:47 Loading proxy.properties
+2023-08-15 21:12:47 Using yaml template: yaml/sdc-service-ingress.yaml
+2023-08-15 21:12:48 Done
+---------
+Creating StreamSets Deployment
+Environment Name aks-ns1
+SDC Suffix: sdc3
+---------
+2023-08-15 21:12:48 Connecting to Control Hub
+2023-08-15 21:12:49 Getting the environment
+2023-08-15 21:12:49 Found environment aks-ns1
+2023-08-15 21:12:49 Getting the namespace
+2023-08-15 21:12:49 Using namespace ns1
+2023-08-15 21:12:49 Creating a deployment builder
+2023-08-15 21:12:49 Creating deployment aks-ns1-sdc3
+2023-08-15 21:12:51 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-15 21:12:51 Loading sdc.properties
+2023-08-15 21:12:51 Loading credential-stores.properties
+2023-08-15 21:12:51 Loading security.policy
+2023-08-15 21:12:51 Loading sdc-log4j2.properties
+2023-08-15 21:12:51 Loading proxy.properties
+2023-08-15 21:12:51 Using yaml template: yaml/sdc-service-ingress.yaml
+2023-08-15 21:12:51 Done
+```
+
+#### Start the new Deployments
+
+<img src="images/start3.png" alt="start3" width="700"/>
+
+Wait for all of the Deployments to become Active:
+
+<img src="images/active3.png" alt="active3" width="700"/>
+
+Confirm all the engines are accessible:
+
+<img src="images/access3.png" alt="access3" width="700"/>
 

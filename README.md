@@ -109,7 +109,7 @@ Also, if you need to set a proxy for the Kubernetes Agent, set that on or around
 
 
 #### Deploy the Agent
-Apply the agent.yaml script to deploy the Agent:
+Apply the <code>agent.yaml</code> script to deploy the Agent:
 
 	$ kubectl apply -f agent.yaml
 
@@ -183,7 +183,7 @@ Make the script <code>create-k8s-deployment.sh</code> executable:
 
 	$ chmod +x create-k8s-deployment.sh
 
-Execute the script, passing it two args: the name of your StreamSets Kubernetes Environment, and the Deployment suffix.  For example:
+Execute the script, passing it two args: the name of your StreamSets Kubernetes Environment and the Deployment suffix.  For example:
 
 	./create-k8s-deployment.sh aks-ns1 sdc1
 

@@ -70,5 +70,5 @@ I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files 
 
 I'll create a new Kubernetes Environment named aks-ns1:
 
-<img src="images/env-1.png" alt="env-1" width="800"/>
+<img src="images/env-1.png" alt="env-1" width="400"/>
 

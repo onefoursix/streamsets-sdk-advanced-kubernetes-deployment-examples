@@ -68,7 +68,61 @@ I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files 
 
 ### Create a Kubernetes Environment
 
-I'll create a new Kubernetes Environment named aks-ns1:
+Create a new Kubernetes Environment named <code>aks-ns1</code> and set the namespace to <code>ns1</code>. Activate the Environment but do not play the generated shell command; instead, click the <code>View Kubernetes YAML</code> button. In the dialog that opens, click the <code>copy</code> button. Paste the text into a text document on your local machine named <code>agent.yaml</code> (the name is not critical).
 
-<img src="images/env-1.png" alt="env-1" width="500"/>
+#### Edit the generated YAML for the Agent
+
+On or around line 21, replace this line:
+
+    resources: ["pods"]
+
+with this line:
+
+	resources: ["pods", "services"]
+
+And add this new section:
+
+```
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+```
+
+That change will allow the Kubernetes Agent to create Service and Ingress resources
+
+The updated rules section in the Role resource should look like this:
+
+```
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "create", "patch", "delete"]
+```
+
+
+Also, if you need to set a proxy for the Kubernetes Agent, set that on or around line 102 as the value for the environment variable <code>STREAMSETS_KUBERNETES_AGENT_JAVA_OPTS</code> (for details on this step, see the docs [here](https://docs.streamsets.com/portal/platform-controlhub/controlhub/UserGuide/Environments/Kubernetes.html#task_tgv_rrg_lwb)).
+
+
+#### Deploy the Agent
+
+Apply the agent.yaml script to deploy the Agent:
+
+	$ kubectl apply -f agent.yaml
+
+Make sure the Agent comes online for the Environment:
+
+<img src="images/agent.png" alt="agent" width="700"/>
+
+
 

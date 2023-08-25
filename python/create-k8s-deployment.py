@@ -26,7 +26,7 @@ def print_message(message):
 
 # Method to read a deployment property
 def get_deployment_property(key):
-    value = deployment_properties[key]
+    value = deployment_properties[key].strip()
     if value is None:
         print('Error: no value for deployment property key \'' + key + '\'' )
         print('Script will exit')
@@ -58,6 +58,11 @@ sch_url = get_deployment_property('SCH_URL')
 org_id = get_deployment_property('ORG_ID')
 environment_name = get_deployment_property('ENVIRONMENT_NAME')
 load_balancer_hostname = get_deployment_property('LOAD_BALANCER_HOSTNAME')
+backend_protocol = get_deployment_property('BACKEND_PROTOCOL').lower()
+if backend_protocol == 'https':
+    sdc_keystore = get_deployment_property('SDC_KEYSTORE')
+else:
+    sdc_keystore = 'streamsets.jks' # The default SDC keystore
 sdc_deployment_manifest= get_deployment_property('SDC_DEPLOYMENT_MANIFEST')
 sdc_version = get_deployment_property('SDC_VERSION')
 deployment_tags = get_deployment_property('DEPLOYMENT_TAGS')
@@ -74,6 +79,16 @@ limits_memory = get_deployment_property('LIMITS_MEMORY')
 requests_cpu = get_deployment_property('REQUESTS_CPU')
 limits_cpu = get_deployment_property('LIMITS_CPU')
 
+# Set SDC ports
+if backend_protocol == 'http':
+    http_port = "18630"
+    https_port = "-1"
+elif backend_protocol == 'https':
+    http_port = "-1"
+    https_port = "18630"
+else:
+    print('Error: BACKEND_PROTOCOL should be either \'http\' or \'https\' but was \'' + backend_protocol + '\'')
+    sys.exit(-1)
 
 # Connect to Control Hub
 print_message('Connecting to Control Hub')
@@ -136,8 +151,18 @@ advanced_engine_config = engine_config.advanced_configuration
 print_message('Loading sdc.properties') 
 with open('etc/sdc.properties') as f:
     sdc_properties = f.read()
+
+
 sdc_url = 'https://' + load_balancer_hostname + '/' + deployment_suffix + '/'
+print_message('Setting SDC URL to ' + sdc_url)
 sdc_properties = sdc_properties.replace('${SDC_BASE_HTTP_URL}', sdc_url)
+print_message('Setting SDC http.port to ' + http_port)
+sdc_properties = sdc_properties.replace('${HTTP_PORT}', http_port)
+print_message('Setting SDC https.port to ' + https_port)
+sdc_properties = sdc_properties.replace('${HTTPS_PORT}', https_port)
+if backend_protocol == 'https':
+    print_message('Setting SDC keystore to ' + sdc_keystore)
+    sdc_properties = sdc_properties.replace('${KEYSTORE}', sdc_keystore)
 advanced_engine_config.data_collector_configuration = sdc_properties
 
 # credential-stores.properties
@@ -179,17 +204,34 @@ with open(sdc_deployment_manifest) as f:
 short_deployment_id = deployment.deployment_id[0:deployment.deployment_id.index(':')]
 
 # Replace the tokens in the YAML template
+print_message('Setting DEP_ID to ' + short_deployment_id)
 yaml = yaml.replace('${DEP_ID}', short_deployment_id)
+print_message('Setting NAMESPACE to ' + namespace)
 yaml = yaml.replace('${NAMESPACE}', namespace)
+print_message('Setting SDC_VERSION to ' + sdc_version)
 yaml = yaml.replace('${SDC_VERSION}', sdc_version)
+print_message('Setting ORG_ID to ' + org_id)
 yaml = yaml.replace('${ORG_ID}', org_id)
+print_message('Setting SCH_URL to ' + sch_url)
 yaml = yaml.replace('${SCH_URL}', sch_url)
+print_message('Setting REQUESTS_MEMORY to ' + requests_memory)
 yaml = yaml.replace('${REQUESTS_MEMORY}', requests_memory)
+print_message('Setting LIMITS_MEMORY to ' + limits_memory)
 yaml = yaml.replace('${LIMITS_MEMORY}', limits_memory)
+print_message('Setting REQUESTS_CPU to ' + requests_cpu)
 yaml = yaml.replace('${REQUESTS_CPU}', requests_cpu)
+print_message('Setting LIMITS_CPU to ' + limits_cpu)
 yaml = yaml.replace('${LIMITS_CPU}', limits_cpu)
+print_message('Setting DEPLOYMENT_SUFFIX to ' + deployment_suffix)
 yaml = yaml.replace('${DEPLOYMENT_SUFFIX}', deployment_suffix)
+print_message('Setting LOAD_BALANCER_HOSTNAME to ' + load_balancer_hostname)
 yaml = yaml.replace('${LOAD_BALANCER_HOSTNAME}', load_balancer_hostname)
+if backend_protocol == 'https':
+    print_message('Setting KEYSTORE to ' + sdc_keystore)
+    yaml = yaml.replace('${KEYSTORE}', sdc_keystore)
+print_message('Setting BACKEND_PROTOCOL to ' + backend_protocol.upper())
+yaml = yaml.replace('${BACKEND_PROTOCOL}', backend_protocol.upper())
+
 
 # Assign the yaml to the deployment
 deployment.yaml = yaml

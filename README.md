@@ -12,13 +12,9 @@ This project provides an example of how to use the [StreamSets Platform SDK](htt
 - [API Credentials](https://docs.streamsets.com/portal/platform-controlhub/controlhub/UserGuide/OrganizationSecurity/APICredentials_title.html#concept_vpm_p32_qqb) for a user with permissions to create Deployments 
 
 ### Configuration Details
-- This example assumes TLS will be terminated at the Load Balancer with backend communication to SDC Pods over http.  The example could easily be extended to support backend communication to SDC over https
+- This project deploys one or more SDCs, each within its own deployment, with a Service and Ingress per SDC.
 
-- A custom https URL will be set in the engine's <code>sdc.base.http.url</code> property
-
-- The engine's <code>http.enable.forwarded.requests</code> property will be set to <code>true</code>
-
-- A Kubernetes Service and Ingress will be created for the Data Collector deployment
+- TLS is terminated at the ingress controller, with options to have the Ingress Controller use either <code>https</code> or <code>http</code> as the backend protocol to forward requests to SDCs.  If using <code>https</code> as the backend protocol, set a custom keystore for SDC as described below. Regardless of the backend protocol, SDC will have an <code>https</code> URL, so in either case, SDC will function as an Authoring Engine.
 
 - Path-based routing will be configured for the Ingress
 
@@ -55,14 +51,27 @@ I added a record to my DNS to map the name <code>aks.onefoursix.com</code> to th
 	Address: 20.69.83.54
 
 ### Store a TLS key and cert for the Load Balancer in a Secret
-I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files <code>tls.crt</code> and <code>tls.key</code> respectively. Store the TLS key and cert in a Kubernetes Secret:
+I'll use a wildcard cert and key for <code>*.onefoursix.com</code> in the files <code>tls.crt</code> and <code>tls.key</code> respectively. Store the TLS key and cert in a Kubernetes tls Secret:
 
 	$ kubectl -n ns1 create secret tls streamsets-tls \
     	--key ~/certs/tls.key --cert ~/certs/tls.crt
 
+This step is not necessary if the load balancer is a Layer-4 load balancer just doing TCP passthrough without terminating TLS. In this example, the load balancer is a Layer-7 load balancer and does terminate TLS, and can then, optionally, use TLS to talk to backend SDCs.
+
+
+
+### If SDCs are configured to use https themselves, store a custom keystore and keystore password in Secret
+If the backend protocol is <code>https</code> we'll need to set a custom keystore for SDC. I'll package the TLS key and cert used for the Load Balancer into a keystore named <code>onefoursix.jks</code>, and save that keystore in a Kubernetes Secret named <code>sdc-keystore</code>:
+
+	$ kubectl -n ns1 create secret generic sdc-keystore --from-file=onefoursix.jks
+	
+I'll also save the keystore password in a secret named <code>sdc-keystore-password</code>
+
+	$ kubectl -n ns1 create secret generic sdc-keystore-password --from-file=keystore-password.txt
+
 
 ### Create a Kubernetes Environment
-Create a new Kubernetes Environment named <code>aks-ns1</code> and set the namespace to <code>ns1</code>. Activate the Environment but do not play the generated shell command; instead, click the <code>View Kubernetes YAML</code> button. In the dialog that opens, click the <code>copy</code> button. Paste the text into a text document on your local machine named <code>agent.yaml</code> (the name is not critical).
+I'll create a new Kubernetes Environment named <code>aks-ns1</code> and set the namespace to <code>ns1</code>. Activate the Environment but do not play the generated shell command; instead, click the <code>View Kubernetes YAML</code> button. In the dialog that opens, click the <code>copy</code> button. Paste the text into a text document on your local machine named <code>agent.yaml</code> (the name is not critical).
 
 #### Edit the generated YAML for the Agent
 On or around line 21, replace this line:
@@ -121,35 +130,40 @@ Make sure the Agent comes online for the Environment:
 Clone this project to your local machine. 
 
 #### Edit deployment.properties
-Edit the file <code>deployment.properties</code> in the root of the project. Here is an example <code>deployment.properties</code> file for my environment:
+Edit the file <code>deployment.properties</code> in the root of the project. 
+
+See the comments in the [deployment.properties](deployment.properties) file for comments about each property.
+
+Here is an example <code>deployment.properties</code> file for my environment that specifies <code>https</code> as the backend protocol and sets a custom keystore:
 
 ```
 [deployment]
+SCH_URL=https://na01.hub.streamsets.com
+ORG_ID=8030c2e9-xxxx-xxxx-xxxx-97c8d4369386
+ENVIRONMENT_NAME=aks-ns1
+LOAD_BALANCER_HOSTNAME=aks.onefoursix.com
+BACKEND_PROTOCOL=https
+SDC_KEYSTORE=onefoursix.jks
 
-SCH_URL: https://na01.hub.streamsets.com
-ORG_ID: 8030c2e9-xxxx-xxxx-xxxx-97c8d4369386
-ENVIRONMENT_NAME: aks-ns1
-LOAD_BALANCER_HOSTNAME: aks.onefoursix.com
+SDC_DEPLOYMENT_MANIFEST=yaml/sdc-service-ingress-keystore.yaml
+SDC_VERSION=5.6.0
 
-SDC_DEPLOYMENT_MANIFEST: yaml/sdc-service-ingress.yaml
-SDC_VERSION: 5.6.0
+DEPLOYMENT_TAGS=k8s-sdc-5.6.0,california
 
-DEPLOYMENT_TAGS: k8s-sdc-5.6.0,california
+USER_STAGE_LIBS=apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
 
-USER_STAGE_LIBS: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+ENGINE_LABELS=dev,california
 
-ENGINE_LABELS: dev,california
+SDC_MAX_CPU_LOAD=80.0
+SDC_MAX_MEMORY_USED=70.0
+SDC_MAX_PIPELINES_RUNNING=10
 
-SDC_MAX_CPU_LOAD: 80.0
-SDC_MAX_MEMORY_USED: 70.0
-SDC_MAX_PIPELINES_RUNNING: 10
+SDC_JAVA_MIN_HEAP_MB=2024
+SDC_JAVA_MAX_HEAP_MB=2024
+SDC_JAVA_OPTS=""
 
-SDC_JAVA_MIN_HEAP_MB: 2024
-SDC_JAVA_MAX_HEAP_MB: 2024
-SDC_JAVA_OPTS: ""
-
-REQUESTS_MEMORY: 3Gi
-LIMITS_MEMORY: 4Gi
+REQUESTS_MEMORY=3Gi
+LIMITS_MEMORY=4Gi
 REQUESTS_CPU: 1000m
 LIMITS_CPU: 3000m
 ```
@@ -166,10 +180,47 @@ Edit any of the additional files in the project's <code>etc</code> directory as 
  
 Note that the included <code>sdc.properties</code> file is a template that contains tokens like <code>${SDC_BASE_HTTP_URL}</code> that will be replaced by the Python script.  Change any other properties as needed.
 
+You can avoid storing sensitive values in the <code>credential-stores.properties</code> file by setting values in the file like this:
 
+```
+credentialStore.aws.config.access.key=${file("aws-access-key.txt")}
+credentialStore.aws.config.secret.key=${file("aws-secret-key.txt")}
+```
+Store the sensitive values in Kubernetes Secrets, and then add Volume and VolumeMount sections to the manifest used in the project, like tthis:
+
+```
+    spec:
+      containers:
+        - env:
+          ...
+          volumeMounts:
+            - mountPath: /etc/sdc/aws-access-key.txt
+              name: aws-access-key
+              subPath: aws-access-key.txt
+            - mountPath: /etc/sdc/aws-secret-key.txt
+              name: aws-secret-key
+              subPath: aws-secret-key.txt
+      ...
+      volumes:
+        - name: aws-access-key
+          secret:
+            secretName: aws-access-key
+        - name: aws-secret-key
+          secret:
+            secretName: aws-secret-key
+
+```
+Of course, it's far better to use <code>instanceProfile</code> security method rather than access keys, but if you have to use them, at least store them in Secrets rather than in the property files.
+
+ 
 #### Edit the deployment manifest (optional) 
 
-Edit the manifest file <code>yaml/sdc-service-ingress.yaml</code> template as needed as well.  Note that many of the property values, like <code>${DEP_ID}</code> will be replaced by the Python script. 
+There are two manifest templates included in the project: 
+
+- <code>yaml/sdc-service-ingress-keystore.yaml</code> for <code>https</code> backend protocol
+- <code>yaml/sdc-service-ingress.yaml</code> for <code>http</code> backend protocol
+
+Edit the manifest file template you need.  Note that many of the property values, like <code>${DEP_ID}</code> will be replaced by the Python script. 
 
 
 ### Set your API Credentials
@@ -193,24 +244,40 @@ $ ./create-k8s-deployment.sh aks-ns1 sdc1
 ---------
 Creating StreamSets Deployment
 Environment Name aks-ns1
-SDC Suffix: sdc1
+DEPLOYMENT_SUFFIX: sdc1
 ---------
 
-2023-08-15 17:04:14 Connecting to Control Hub
-2023-08-15 17:04:15 Getting the environment
-2023-08-15 17:04:15 Found environment aks-ns1
-2023-08-15 17:04:15 Getting the namespace
-2023-08-15 17:04:15 Using namespace ns1
-2023-08-15 17:04:15 Creating a deployment builder
-2023-08-15 17:04:15 Creating deployment aks-ns1-sdc1
-2023-08-15 17:04:27 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
-2023-08-15 17:04:27 Loading sdc.properties
-2023-08-15 17:04:27 Loading credential-stores.properties
-2023-08-15 17:04:27 Loading security.policy
-2023-08-15 17:04:27 Loading sdc-log4j2.properties
-2023-08-15 17:04:27 Loading proxy.properties
-2023-08-15 17:04:29 Using yaml template: yaml/sdc-service-ingress.yaml
-2023-08-15 17:04:29 Done
+2023-08-24 21:47:24 Connecting to Control Hub
+2023-08-24 21:47:25 Getting the environment
+2023-08-24 21:47:25 Found environment aks-ns1
+2023-08-24 21:47:25 Using namespace ns1
+2023-08-24 21:47:25 Creating a deployment builder
+2023-08-24 21:47:25 Creating deployment aks-ns1-sdc1
+2023-08-24 21:47:28 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-24 21:47:28 Loading sdc.properties
+2023-08-24 21:47:28 Setting SDC URL to https://aks.onefoursix.com/sdc1/
+2023-08-24 21:47:28 Setting SDC http.port to -1
+2023-08-24 21:47:28 Setting SDC https.port to 18630
+2023-08-24 21:47:28 Setting SDC keystore to onefoursix.jks
+2023-08-24 21:47:28 Loading credential-stores.properties
+2023-08-24 21:47:28 Loading security.policy
+2023-08-24 21:47:28 Loading sdc-log4j2.properties
+2023-08-24 21:47:28 Loading proxy.properties
+2023-08-24 21:47:29 Using yaml template: yaml/sdc-service-ingress-keystore.yaml
+2023-08-24 21:47:29 Setting DEP_ID to 422ba761-6ab1-4deb-9b3b-f8db43c32d61
+2023-08-24 21:47:29 Setting NAMESPACE to ns1
+2023-08-24 21:47:29 Setting SDC_VERSION to 5.6.0
+2023-08-24 21:47:29 Setting ORG_ID to 8030c2e9-1a39-xxxx-xxxx-97c8d4369386
+2023-08-24 21:47:29 Setting SCH_URL to https://na01.hub.streamsets.com
+2023-08-24 21:47:29 Setting REQUESTS_MEMORY to 3Gi
+2023-08-24 21:47:29 Setting LIMITS_MEMORY to 4Gi
+2023-08-24 21:47:29 Setting REQUESTS_CPU to 1000m
+2023-08-24 21:47:29 Setting LIMITS_CPU to 3000m
+2023-08-24 21:47:29 Setting DEPLOYMENT_SUFFIX to sdc1
+2023-08-24 21:47:29 Setting LOAD_BALANCER_HOSTNAME to aks.onefoursix.com
+2023-08-24 21:47:29 Setting KEYSTORE to onefoursix.jks
+2023-08-24 21:47:29 Setting BACKEND_PROTOCOL to HTTPS
+2023-08-24 21:47:29 Done
 ```
 
 #### Inspect the Deployment
@@ -250,7 +317,7 @@ Execute the script, passing it two args: the name of your StreamSets Kubernetes 
 If all goes well you should see console output like this:
 
 ```
-$ ./create-multiple-k8s-deployments.sh aks-ns1 sdc1,sdc2,sdc3
+$  ./create-multiple-k8s-deployments.sh aks-ns1 sdc1,sdc2,sdc3
 ---------
 Creating StreamSets Deployments
 Environment Name aks-ns1
@@ -262,61 +329,109 @@ Creating StreamSets Deployment
 Environment Name aks-ns1
 SDC Suffix: sdc1
 ---------
-2023-08-15 21:12:40 Connecting to Control Hub
-2023-08-15 21:12:41 Getting the environment
-2023-08-15 21:12:41 Found environment aks-ns1
-2023-08-15 21:12:41 Getting the namespace
-2023-08-15 21:12:41 Using namespace ns1
-2023-08-15 21:12:41 Creating a deployment builder
-2023-08-15 21:12:41 Creating deployment aks-ns1-sdc1
-2023-08-15 21:12:43 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
-2023-08-15 21:12:43 Loading sdc.properties
-2023-08-15 21:12:43 Loading credential-stores.properties
-2023-08-15 21:12:43 Loading security.policy
-2023-08-15 21:12:43 Loading sdc-log4j2.properties
-2023-08-15 21:12:43 Loading proxy.properties
-2023-08-15 21:12:44 Using yaml template: yaml/sdc-service-ingress.yaml
-2023-08-15 21:12:44 Done
+2023-08-24 21:51:05 Connecting to Control Hub
+2023-08-24 21:51:06 Getting the environment
+2023-08-24 21:51:06 Found environment aks-ns1
+2023-08-24 21:51:06 Using namespace ns1
+2023-08-24 21:51:06 Creating a deployment builder
+2023-08-24 21:51:06 Creating deployment aks-ns1-sdc1
+2023-08-24 21:51:08 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-24 21:51:08 Loading sdc.properties
+2023-08-24 21:51:08 Setting SDC URL to https://aks.onefoursix.com/sdc1/
+2023-08-24 21:51:08 Setting SDC http.port to -1
+2023-08-24 21:51:08 Setting SDC https.port to 18630
+2023-08-24 21:51:08 Setting SDC keystore to onefoursix.jks
+2023-08-24 21:51:08 Loading credential-stores.properties
+2023-08-24 21:51:08 Loading security.policy
+2023-08-24 21:51:08 Loading sdc-log4j2.properties
+2023-08-24 21:51:08 Loading proxy.properties
+2023-08-24 21:51:08 Using yaml template: yaml/sdc-service-ingress-keystore.yaml
+2023-08-24 21:51:08 Setting DEP_ID to 88030393-9cce-4310-9c89-c2af4077caf3
+2023-08-24 21:51:08 Setting NAMESPACE to ns1
+2023-08-24 21:51:08 Setting SDC_VERSION to 5.6.0
+2023-08-24 21:51:08 Setting ORG_ID to 8030c2e9-1a39-xxxx-xxxx-97c8d4369386
+2023-08-24 21:51:08 Setting SCH_URL to https://na01.hub.streamsets.com
+2023-08-24 21:51:08 Setting REQUESTS_MEMORY to 3Gi
+2023-08-24 21:51:08 Setting LIMITS_MEMORY to 4Gi
+2023-08-24 21:51:08 Setting REQUESTS_CPU to 1000m
+2023-08-24 21:51:08 Setting LIMITS_CPU to 3000m
+2023-08-24 21:51:08 Setting DEPLOYMENT_SUFFIX to sdc1
+2023-08-24 21:51:08 Setting LOAD_BALANCER_HOSTNAME to aks.onefoursix.com
+2023-08-24 21:51:08 Setting KEYSTORE to onefoursix.jks
+2023-08-24 21:51:08 Setting BACKEND_PROTOCOL to HTTPS
+2023-08-24 21:51:08 Done
 ---------
 Creating StreamSets Deployment
 Environment Name aks-ns1
 SDC Suffix: sdc2
 ---------
-2023-08-15 21:12:44 Connecting to Control Hub
-2023-08-15 21:12:45 Getting the environment
-2023-08-15 21:12:45 Found environment aks-ns1
-2023-08-15 21:12:45 Getting the namespace
-2023-08-15 21:12:45 Using namespace ns1
-2023-08-15 21:12:45 Creating a deployment builder
-2023-08-15 21:12:45 Creating deployment aks-ns1-sdc2
-2023-08-15 21:12:47 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
-2023-08-15 21:12:47 Loading sdc.properties
-2023-08-15 21:12:47 Loading credential-stores.properties
-2023-08-15 21:12:47 Loading security.policy
-2023-08-15 21:12:47 Loading sdc-log4j2.properties
-2023-08-15 21:12:47 Loading proxy.properties
-2023-08-15 21:12:47 Using yaml template: yaml/sdc-service-ingress.yaml
-2023-08-15 21:12:48 Done
+2023-08-24 21:51:09 Connecting to Control Hub
+2023-08-24 21:51:10 Getting the environment
+2023-08-24 21:51:10 Found environment aks-ns1
+2023-08-24 21:51:10 Using namespace ns1
+2023-08-24 21:51:10 Creating a deployment builder
+2023-08-24 21:51:10 Creating deployment aks-ns1-sdc2
+2023-08-24 21:51:12 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-24 21:51:12 Loading sdc.properties
+2023-08-24 21:51:12 Setting SDC URL to https://aks.onefoursix.com/sdc2/
+2023-08-24 21:51:12 Setting SDC http.port to -1
+2023-08-24 21:51:12 Setting SDC https.port to 18630
+2023-08-24 21:51:12 Setting SDC keystore to onefoursix.jks
+2023-08-24 21:51:12 Loading credential-stores.properties
+2023-08-24 21:51:12 Loading security.policy
+2023-08-24 21:51:12 Loading sdc-log4j2.properties
+2023-08-24 21:51:12 Loading proxy.properties
+2023-08-24 21:51:12 Using yaml template: yaml/sdc-service-ingress-keystore.yaml
+2023-08-24 21:51:12 Setting DEP_ID to 4fbfa037-6fe2-4c15-b913-b3769a4ab669
+2023-08-24 21:51:12 Setting NAMESPACE to ns1
+2023-08-24 21:51:12 Setting SDC_VERSION to 5.6.0
+2023-08-24 21:51:12 Setting ORG_ID to 8030c2e9-1a39-xxxx-xxxx-97c8d4369386
+2023-08-24 21:51:12 Setting SCH_URL to https://na01.hub.streamsets.com
+2023-08-24 21:51:12 Setting REQUESTS_MEMORY to 3Gi
+2023-08-24 21:51:12 Setting LIMITS_MEMORY to 4Gi
+2023-08-24 21:51:12 Setting REQUESTS_CPU to 1000m
+2023-08-24 21:51:12 Setting LIMITS_CPU to 3000m
+2023-08-24 21:51:12 Setting DEPLOYMENT_SUFFIX to sdc2
+2023-08-24 21:51:12 Setting LOAD_BALANCER_HOSTNAME to aks.onefoursix.com
+2023-08-24 21:51:12 Setting KEYSTORE to onefoursix.jks
+2023-08-24 21:51:12 Setting BACKEND_PROTOCOL to HTTPS
+2023-08-24 21:51:13 Done
 ---------
 Creating StreamSets Deployment
 Environment Name aks-ns1
 SDC Suffix: sdc3
 ---------
-2023-08-15 21:12:48 Connecting to Control Hub
-2023-08-15 21:12:49 Getting the environment
-2023-08-15 21:12:49 Found environment aks-ns1
-2023-08-15 21:12:49 Getting the namespace
-2023-08-15 21:12:49 Using namespace ns1
-2023-08-15 21:12:49 Creating a deployment builder
-2023-08-15 21:12:49 Creating deployment aks-ns1-sdc3
-2023-08-15 21:12:51 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
-2023-08-15 21:12:51 Loading sdc.properties
-2023-08-15 21:12:51 Loading credential-stores.properties
-2023-08-15 21:12:51 Loading security.policy
-2023-08-15 21:12:51 Loading sdc-log4j2.properties
-2023-08-15 21:12:51 Loading proxy.properties
-2023-08-15 21:12:51 Using yaml template: yaml/sdc-service-ingress.yaml
-2023-08-15 21:12:51 Done
+2023-08-24 21:51:13 Connecting to Control Hub
+2023-08-24 21:51:14 Getting the environment
+2023-08-24 21:51:14 Found environment aks-ns1
+2023-08-24 21:51:14 Using namespace ns1
+2023-08-24 21:51:14 Creating a deployment builder
+2023-08-24 21:51:14 Creating deployment aks-ns1-sdc3
+2023-08-24 21:51:16 Adding Stage Libs: apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
+2023-08-24 21:51:16 Loading sdc.properties
+2023-08-24 21:51:16 Setting SDC URL to https://aks.onefoursix.com/sdc3/
+2023-08-24 21:51:16 Setting SDC http.port to -1
+2023-08-24 21:51:16 Setting SDC https.port to 18630
+2023-08-24 21:51:16 Setting SDC keystore to onefoursix.jks
+2023-08-24 21:51:16 Loading credential-stores.properties
+2023-08-24 21:51:16 Loading security.policy
+2023-08-24 21:51:16 Loading sdc-log4j2.properties
+2023-08-24 21:51:16 Loading proxy.properties
+2023-08-24 21:51:16 Using yaml template: yaml/sdc-service-ingress-keystore.yaml
+2023-08-24 21:51:16 Setting DEP_ID to 7b9844db-cf45-4494-bcc7-1eab7f36fc67
+2023-08-24 21:51:16 Setting NAMESPACE to ns1
+2023-08-24 21:51:16 Setting SDC_VERSION to 5.6.0
+2023-08-24 21:51:16 Setting ORG_ID to 8030c2e9-1a39-xxxx-xxxx-97c8d4369386
+2023-08-24 21:51:16 Setting SCH_URL to https://na01.hub.streamsets.com
+2023-08-24 21:51:16 Setting REQUESTS_MEMORY to 3Gi
+2023-08-24 21:51:16 Setting LIMITS_MEMORY to 4Gi
+2023-08-24 21:51:16 Setting REQUESTS_CPU to 1000m
+2023-08-24 21:51:16 Setting LIMITS_CPU to 3000m
+2023-08-24 21:51:16 Setting DEPLOYMENT_SUFFIX to sdc3
+2023-08-24 21:51:16 Setting LOAD_BALANCER_HOSTNAME to aks.onefoursix.com
+2023-08-24 21:51:16 Setting KEYSTORE to onefoursix.jks
+2023-08-24 21:51:16 Setting BACKEND_PROTOCOL to HTTPS
+2023-08-24 21:51:17 Done
 ```
 
 #### Start the new Deployments

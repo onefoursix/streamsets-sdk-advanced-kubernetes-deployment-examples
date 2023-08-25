@@ -164,8 +164,8 @@ SDC_JAVA_OPTS=""
 
 REQUESTS_MEMORY=3Gi
 LIMITS_MEMORY=4Gi
-REQUESTS_CPU: 1000m
-LIMITS_CPU: 3000m
+REQUESTS_CPU=1000m
+LIMITS_CPU=3000m
 ```
 
 #### Edit additional config files  (optional) 

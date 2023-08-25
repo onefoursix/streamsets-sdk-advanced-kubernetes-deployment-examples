@@ -60,7 +60,7 @@ This step is not necessary if the load balancer is a Layer-4 load balancer just 
 
 
 
-### If SDCs are configured to use https themselves, store a custom keystore and keystore password in Secret
+### If SDCs are configured to use https themselves, store a custom keystore and keystore password in a Secret
 If the backend protocol is <code>https</code> we'll need to set a custom keystore for SDC. I'll package the TLS key and cert used for the Load Balancer into a keystore named <code>onefoursix.jks</code>, and save that keystore in a Kubernetes Secret named <code>sdc-keystore</code>:
 
 	$ kubectl -n ns1 create secret generic sdc-keystore --from-file=onefoursix.jks
@@ -134,7 +134,7 @@ Edit the file <code>deployment.properties</code> in the root of the project.
 
 See the comments in the [deployment.properties](deployment.properties) file for comments about each property.
 
-Here is an example <code>deployment.properties</code> file for my environment that specifies <code>https</code> as the backend protocol and sets a custom keystore:
+Here is an example <code>deployment.properties</code> file for my environment that specifies <code>https</code> as the backend protocol, sets a custom keystore, and uses the template <code>yaml/sdc-service-ingress-keystore.yaml</code> :
 
 ```
 [deployment]
@@ -210,7 +210,7 @@ Store the sensitive values in Kubernetes Secrets, and then add Volume and Volume
             secretName: aws-secret-key
 
 ```
-Of course, it's far better to use <code>instanceProfile</code> security method rather than access keys, but if you have to use them, at least store them in Secrets rather than in the property files.
+Of course, it's far better to use the <code>instanceProfile</code> security method rather than access keys, but if you have to use keys, at least store them in Secrets rather than in the properties files.
 
  
 #### Edit the deployment manifest (optional) 

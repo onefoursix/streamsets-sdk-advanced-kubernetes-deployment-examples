@@ -21,19 +21,23 @@ echo "Environment Name" $ENV_NAME
 echo "Deployment Suffix List:" $DEPLOYMENT_SUFFIX_LIST
 echo "---------"
 echo ""
-for i in ${DEPLOYMENT_SUFFIX_LIST//,/ }
+
+index=0
+for suffix in ${DEPLOYMENT_SUFFIX_LIST//,/ }
 do
   echo "---------"
   echo "Creating StreamSets Deployment"
   echo "Environment Name" $ENV_NAME
-  echo "SDC Suffix:" "$i"
+  echo "SDC Suffix:" "$suffix"
   echo "---------"
-
-  export DEPLOYMENT_SUFFIX=${i}
+  export DEPLOYMENT_SUFFIX=${suffix}
+  export DEPLOYMENT_INDEX=${index}
 
   # Launch the SDK script
   python python/create-k8s-deployment.py
 
+  # Bump the deployment index
+  index=$((index+1))
 done
 
 

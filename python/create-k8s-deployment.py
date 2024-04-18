@@ -6,7 +6,7 @@ This script creates and optionally starts a Kubernetes Deployment on StreamSets 
 Prerequisites:
  - Python 3.6+
 
- - StreamSets DataOps Platform SDK for Python v5.1+
+ - StreamSets DataOps Platform SDK for Python v6.1+
    See: https://docs.streamsets.com/platform-sdk/latest/learn/installation.html
 
  - DataOps Platform API Credentials for a user with Organization Administrator role
@@ -27,7 +27,7 @@ def print_message(message):
 # Method to read a deployment property
 def get_deployment_property(key):
     value = deployment_properties[key].strip()
-    if value is None:
+    if value is None or len(value) == 0:
         print('Error: no value for deployment property key \'' + key + '\'' )
         print('Script will exit')
         sys.exit(-1)
@@ -37,7 +37,8 @@ def get_deployment_property(key):
 cred_id = os.getenv('CRED_ID')
 cred_token = os.getenv('CRED_TOKEN')
 
-# Get the Environment Name and Deployment Suffix from the environment.
+# Get the Environment Name, Deployment Suffix, and optional 
+# Deployment Index (if creating multiple deployments) from the environment.
 # This makes it easier to support the creation of 
 # multple identical deployments from a top-level driver script 
 # that may call this script multiple times.  In such cases
@@ -47,6 +48,7 @@ cred_token = os.getenv('CRED_TOKEN')
 # or the Environment name
 env_name = os.getenv('ENV_NAME')
 deployment_suffix = os.getenv('DEPLOYMENT_SUFFIX')
+deployment_index = os.getenv('DEPLOYMENT_INDEX', 0)
 
 # Read the deployment.properties file
 config = ConfigParser()
@@ -58,11 +60,19 @@ sch_url = get_deployment_property('SCH_URL')
 org_id = get_deployment_property('ORG_ID')
 environment_name = get_deployment_property('ENVIRONMENT_NAME')
 load_balancer_hostname = get_deployment_property('LOAD_BALANCER_HOSTNAME')
+
+# If use_node_port_service is true, get the starting service port 
+use_node_port_service = get_deployment_property('USE_NODE_PORT_SERVICE').lower()
+if use_node_port_service == 'true':
+    starting_node_port_service_port = get_deployment_property('STARTING_NODE_PORT_SERVICE_PORT')
+
+# Set the keystore if the backend protocol is https
 backend_protocol = get_deployment_property('BACKEND_PROTOCOL').lower()
 if backend_protocol == 'https':
     sdc_keystore = get_deployment_property('SDC_KEYSTORE')
 else:
     sdc_keystore = 'streamsets.jks' # The default SDC keystore
+
 sdc_deployment_manifest= get_deployment_property('SDC_DEPLOYMENT_MANIFEST')
 sdc_version = get_deployment_property('SDC_VERSION')
 deployment_tags = get_deployment_property('DEPLOYMENT_TAGS')
@@ -89,6 +99,25 @@ elif backend_protocol == 'https':
 else:
     print('Error: BACKEND_PROTOCOL should be either \'http\' or \'https\' but was \'' + backend_protocol + '\'')
     sys.exit(-1)
+
+# Set the Service ports
+# NodePort Service
+if use_node_port_service == 'true':
+    if starting_node_port_service_port.isdigit():
+
+        # Increment the NodePort Service port if we're creating multiple deployments
+        service_port = int(starting_node_port_service_port) + deployment_index
+        if service_port < 30000 or service_port > 32767:
+            print('Error: STARTING_NODE_PORT_SERVICE_PORT should be within the range of 30000 - 32767 but was '\ + STARTING_NODE_PORT_SERVICE_PORT + '\'')
+            sys.exit(-1)
+    else:
+        print('Error: STARTING_NODE_PORT_SERVICE_PORT should be a number within the range of 30000 - 32767 but was '\ + STARTING_NODE_PORT_SERVICE_PORT + '\'')
+        sys.exit(-1)
+
+# ClusterIP Service
+else:
+    service_port = 18630
+
 
 # Connect to Control Hub
 print_message('Connecting to Control Hub')

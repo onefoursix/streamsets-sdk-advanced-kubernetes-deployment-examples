@@ -128,6 +128,7 @@ Edit the file <code>deployment.properties</code> in the root of the project.  Se
 
 ```
 [deployment]
+
 SCH_URL=https://na01.hub.streamsets.com
 ORG_ID=8030c2e9-xxxx-xxxx-xxxx-97c8d4369386
 ENVIRONMENT_NAME=eks-ns1

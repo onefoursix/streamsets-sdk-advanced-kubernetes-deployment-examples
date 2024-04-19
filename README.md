@@ -124,7 +124,7 @@ Make sure the Agent comes online for the Environment:
 Clone this project to your local machine. 
 
 #### Edit deployment.properties
-Edit the file <code>deployment.properties</code> in the root of the project.  Documentation for each property in the file is included in the [deployment.properties](deployment.properties) file.  See the examples folder [here](deployment-properties-examples) for example <code>deployment.properties</code> files configured for AKS and EKS. For example, here is an example <code>deployment.properties</code> file for an EKS environment:
+Edit the file <code>deployment.properties</code> in the root of the project.  See the examples folder [here](deployment-properties-examples) for example deployment.properties files configured for AKS and EKS. For example, here is an example <code>deployment.properties</code> file for an EKS environment:
 
 ```
 [deployment]
@@ -134,15 +134,13 @@ ENVIRONMENT_NAME=eks-ns1
 LOAD_BALANCER_HOSTNAME=eks.onefoursix.com
 USE_NODE_PORT_SERVICE=true
 STARTING_NODE_PORT_SERVICE_PORT=38630
-BACKEND_PROTOCOL=https
-SDC_KEYSTORE=onefoursix.jks
-SDC_DEPLOYMENT_MANIFEST=yaml/sdc-service-ingress-keystore.yaml
+SDC_DEPLOYMENT_MANIFEST=yaml/sdc-service-ingress.yaml
 SDC_VERSION=5.10.0
-DEPLOYMENT_TAGS=k8s-sdc-5.10.0,california
+DEPLOYMENT_TAGS=k8s-sdc-5.6.0,california
 USER_STAGE_LIBS=apache-kafka_3_4,aws,aws-secrets-manager-credentialstore,jdbc,jython_2_7,sdc-snowflake
 ENGINE_LABELS=dev,california
 SDC_MAX_CPU_LOAD=90.0
-SDC_MAX_MEMORY_USED=95.0
+SDC_MAX_MEMORY_USED= 95.0
 SDC_MAX_PIPELINES_RUNNING=10
 SDC_JAVA_MIN_HEAP_MB=2024
 SDC_JAVA_MAX_HEAP_MB=2024

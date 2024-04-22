@@ -10,5 +10,5 @@ maintain-boss.pid
 pretenders-boss.pid
 pretenders.log
 venv/*
-private/*
+private/sdk-env.sh
 *.zip

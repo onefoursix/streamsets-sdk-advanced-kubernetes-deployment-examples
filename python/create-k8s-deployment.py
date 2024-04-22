@@ -1,94 +1,59 @@
 #!/usr/bin/env python
 
-'''
+"""
 This script creates and optionally starts a Kubernetes Deployment on StreamSets Platform
 
 Prerequisites:
  - Python 3.6+
 
- - StreamSets DataOps Platform SDK for Python v5.1+
+ - StreamSets DataOps Platform SDK for Python v6.1+
    See: https://docs.streamsets.com/platform-sdk/latest/learn/installation.html
 
- - DataOps Platform API Credentials for a user with Organization Administrator role
+ - StreamSets Platform API Credentials for a user with Organization Administrator role
 
- - An active StreamSets Kubernetes Environment with an online Kubernetes Agent 
+ - An active StreamSets Kubernetes Environment with an online Kubernetes Agent
+"""
 
-'''
+import datetime
+import os
+import sys
 
-import datetime, os, sys
-from configparser import ConfigParser
 from streamsets.sdk import ControlHub
 
+from config_manager import ConfigManager
 
-# print_message method which writes a timestamp message to the console
+# Check the number of command line args
+if len(sys.argv) not in (4, 5):
+    print('Error:Wrong number of arguments')
+    print('Usage: $ python3 create-k8s-deployment.py <deployment_properties_file> <environment_name> <deployment_suffix> [<deployment_index>]')
+    print('Usage Example: $ python3 create-k8s-deployment.py config/eks-deployment.properties env-1 sdc1')
+    sys.exit(1)
+
+# Get the command line args
+deployment_properties_file = sys.argv[1]
+environment_name = sys.argv[2]
+deployment_suffix = sys.argv[3]
+
+# If this script is called multiple times in a single run, we'll keep track using the deployment index
+if len(sys.argv) == 5:
+    deployment_index = int(sys.argv[4])
+else:
+    deployment_index = 0
+
+
 def print_message(message):
-    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ' ' +   message)
+    print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + ' ' + message)
 
-# Method to read a deployment property
-def get_deployment_property(key):
-    value = deployment_properties[key].strip()
-    if value is None:
-        print('Error: no value for deployment property key \'' + key + '\'' )
-        print('Script will exit')
-        sys.exit(-1)
-    return value
+def replace_in_yaml(yaml, key, value):
+    print_message('- Setting \'%s\' to \'%s\'' % (key, value))
+    return yaml.replace(key, value)
+
+# Load properties from the deployment.properties file
+config = ConfigManager(deployment_properties_file, deployment_index)
 
 # Get Control Hub API credentials from the environment
 cred_id = os.getenv('CRED_ID')
 cred_token = os.getenv('CRED_TOKEN')
-
-# Get the Environment Name and Deployment Suffix from the environment.
-# This makes it easier to support the creation of 
-# multple identical deployments from a top-level driver script 
-# that may call this script multiple times.  In such cases
-# all the values read from deployment.properties file remain the same. 
-# The only values that might change are the deployment suffix, 
-# which might have values like 'sdc1', 'sdc2', 'sdc3', etc...
-# or the Environment name
-env_name = os.getenv('ENV_NAME')
-deployment_suffix = os.getenv('DEPLOYMENT_SUFFIX')
-
-# Read the deployment.properties file
-config = ConfigParser()
-config.read('deployment.properties')
-deployment_properties = config['deployment']
-
-# Get the values in the deployment.properties file
-sch_url = get_deployment_property('SCH_URL')
-org_id = get_deployment_property('ORG_ID')
-environment_name = get_deployment_property('ENVIRONMENT_NAME')
-load_balancer_hostname = get_deployment_property('LOAD_BALANCER_HOSTNAME')
-backend_protocol = get_deployment_property('BACKEND_PROTOCOL').lower()
-if backend_protocol == 'https':
-    sdc_keystore = get_deployment_property('SDC_KEYSTORE')
-else:
-    sdc_keystore = 'streamsets.jks' # The default SDC keystore
-sdc_deployment_manifest= get_deployment_property('SDC_DEPLOYMENT_MANIFEST')
-sdc_version = get_deployment_property('SDC_VERSION')
-deployment_tags = get_deployment_property('DEPLOYMENT_TAGS')
-user_stage_libs = get_deployment_property('USER_STAGE_LIBS')
-engine_labels = get_deployment_property('ENGINE_LABELS')
-sdc_max_cpu_load = get_deployment_property('SDC_MAX_CPU_LOAD')
-sdc_max_memory_used = get_deployment_property('SDC_MAX_MEMORY_USED')
-sdc_max_pipelines_running = get_deployment_property('SDC_MAX_PIPELINES_RUNNING')
-sdc_java_min_heap_mb = get_deployment_property('SDC_JAVA_MIN_HEAP_MB')
-sdc_java_max_heap_mb = get_deployment_property('SDC_JAVA_MAX_HEAP_MB')
-sdc_java_opts = get_deployment_property('SDC_JAVA_OPTS')
-requests_memory = get_deployment_property('REQUESTS_MEMORY')
-limits_memory = get_deployment_property('LIMITS_MEMORY')
-requests_cpu = get_deployment_property('REQUESTS_CPU')
-limits_cpu = get_deployment_property('LIMITS_CPU')
-
-# Set SDC ports
-if backend_protocol == 'http':
-    http_port = "18630"
-    https_port = "-1"
-elif backend_protocol == 'https':
-    http_port = "-1"
-    https_port = "18630"
-else:
-    print('Error: BACKEND_PROTOCOL should be either \'http\' or \'https\' but was \'' + backend_protocol + '\'')
-    sys.exit(-1)
 
 # Connect to Control Hub
 print_message('Connecting to Control Hub')
@@ -96,28 +61,27 @@ sch = ControlHub(credential_id=cred_id, token=cred_token)
 
 # Get the environment
 print_message('Getting the environment')
-environment = sch.environments.get(environment_name = environment_name)
-print_message('Found environment ' + environment_name)
+environment = sch.environments.get(environment_name=environment_name)
 
 # Get the environment's namespace
 namespace = environment.kubernetes_namespace
-print_message('Using namespace ' + namespace)
+print_message('Using namespace \'%s\'' % namespace)
 
 # Create a deployment builder
-print_message('Creating a deployment builder')
 deployment_builder = sch.get_deployment_builder(deployment_type='KUBERNETES')
 
 # Create the name for the deployment
 deployment_name = environment_name + '-' + deployment_suffix
 
 # Create the deployment
-print_message('Creating deployment ' + deployment_name)
-deployment_tags_array = deployment_tags.split(',')
+print_message('Creating deployment \'%s\'' % deployment_name)
+print_message('SDC Version: ' + config.get('SDC_VERSION'))
+print_message('Deployment Tags: ' + str(config.get_deployment_tags()))
 deployment = deployment_builder.build(deployment_name=deployment_name,
                                       environment=environment,
                                       engine_type='DC',
-                                      engine_version=sdc_version,
-                                      deployment_tags=deployment_tags_array)
+                                      engine_version=config.get('SDC_VERSION'),
+                                      deployment_tags=config.get_deployment_tags())
 
 # Add the deployment to Control Hub
 sch.add_deployment(deployment)
@@ -126,43 +90,51 @@ sch.add_deployment(deployment)
 deployment.engine_configuration.stage_libs = ['dataformats', 'dev', 'basic']
 
 # Add user stage libs to the Deployment
-print_message('Adding Stage Libs: ' + user_stage_libs) 
-stage_libs_to_add = user_stage_libs.split(',')
-deployment.engine_configuration.stage_libs.extend(stage_libs_to_add)
+user_stage_libs = config.get_user_stage_libs()
+print_message('Adding Stage Libs: ' + str(user_stage_libs))
+deployment.engine_configuration.stage_libs.extend(user_stage_libs)
 
 # Engine config
 engine_config = deployment.engine_configuration
-engine_config.engine_labels.extend(engine_labels.split(','))
-engine_config.max_cpu_load = sdc_max_cpu_load
-engine_config.max_memory_used = sdc_max_memory_used
-engine_config.max_pipelines_running = sdc_max_pipelines_running
+engine_config.engine_labels.extend(config.get_engine_labels())
+engine_config.max_cpu_load = config.get('SDC_MAX_CPU_LOAD')
+engine_config.max_memory_used = config.get('SDC_MAX_MEMORY_USED')
+engine_config.max_pipelines_running = config.get('SDC_MAX_PIPELINES_RUNNING')
 
 # Engine Java config
 java_config = engine_config.java_configuration
 java_config.java_memory_strategy = 'ABSOLUTE'
-java_config.minimum_java_heap_size_in_mb=sdc_java_min_heap_mb
-java_config.maximum_java_heap_size_in_mb=sdc_java_max_heap_mb
-java_config.java_options = sdc_java_opts
+java_config.minimum_java_heap_size_in_mb = config.get('SDC_JAVA_MIN_HEAP_MB')
+java_config.maximum_java_heap_size_in_mb = config.get('SDC_JAVA_MAX_HEAP_MB')
+java_config.java_options = config.get('SDC_JAVA_OPTS')
 
 # Advanced Engine config
 advanced_engine_config = engine_config.advanced_configuration
 
 # sdc.properties
-print_message('Loading sdc.properties') 
+print_message('---')
+print_message('Setting values in sdc.properties:')
 with open('etc/sdc.properties') as f:
     sdc_properties = f.read()
 
-
-sdc_url = 'https://' + load_balancer_hostname + '/' + deployment_suffix + '/'
-print_message('Setting SDC URL to ' + sdc_url)
+# Create and set the SDC URL
+sdc_url = 'https://' + config.get('LOAD_BALANCER_HOSTNAME') + '/' + deployment_suffix + '/'
+print_message('- Setting URL to ' + sdc_url)
 sdc_properties = sdc_properties.replace('${SDC_BASE_HTTP_URL}', sdc_url)
-print_message('Setting SDC http.port to ' + http_port)
-sdc_properties = sdc_properties.replace('${HTTP_PORT}', http_port)
-print_message('Setting SDC https.port to ' + https_port)
-sdc_properties = sdc_properties.replace('${HTTPS_PORT}', https_port)
-if backend_protocol == 'https':
-    print_message('Setting SDC keystore to ' + sdc_keystore)
-    sdc_properties = sdc_properties.replace('${KEYSTORE}', sdc_keystore)
+
+# Set SDC's http port
+print_message('- Setting http.port to ' + config.get('HTTP_PORT'))
+sdc_properties = sdc_properties.replace('${HTTP_PORT}', config.get('HTTP_PORT'))
+
+# Set SDC's https port
+print_message('- Setting https.port to ' + config.get('HTTPS_PORT'))
+sdc_properties = sdc_properties.replace('${HTTPS_PORT}', config.get('HTTPS_PORT'))
+
+# If using https, set the keystore
+if config.get('BACKEND_PROTOCOL') == 'https':
+    print_message('- Setting keystore to \'%s\'' % (config.get('SDC_KEYSTORE')))
+    sdc_properties = sdc_properties.replace('${KEYSTORE}', config.get('SDC_KEYSTORE'))
+print_message('---')
 advanced_engine_config.data_collector_configuration = sdc_properties
 
 # credential-stores.properties
@@ -193,45 +165,33 @@ advanced_engine_config.proxy_properties = proxy_properties
 sch.update_deployment(deployment)
 
 # Set advanced mode to True to support custom YAML
-deployment._data["advancedMode"]=True
+deployment._data["advancedMode"] = True
 
 # Load the SDC Deployment manifest from the file
-print_message('Using yaml template: ' + sdc_deployment_manifest) 
-with open(sdc_deployment_manifest) as f:
+print_message('---')
+print_message('Setting values in yaml template \'%s\':' % config.get('SDC_DEPLOYMENT_MANIFEST'))
+with open(config.get('SDC_DEPLOYMENT_MANIFEST')) as f:
     yaml = f.read()
-
 # Get the first part of the deployment ID
 short_deployment_id = deployment.deployment_id[0:deployment.deployment_id.index(':')]
 
 # Replace the tokens in the YAML template
-print_message('Setting DEP_ID to ' + short_deployment_id)
-yaml = yaml.replace('${DEP_ID}', short_deployment_id)
-print_message('Setting NAMESPACE to ' + namespace)
-yaml = yaml.replace('${NAMESPACE}', namespace)
-print_message('Setting SDC_VERSION to ' + sdc_version)
-yaml = yaml.replace('${SDC_VERSION}', sdc_version)
-print_message('Setting ORG_ID to ' + org_id)
-yaml = yaml.replace('${ORG_ID}', org_id)
-print_message('Setting SCH_URL to ' + sch_url)
-yaml = yaml.replace('${SCH_URL}', sch_url)
-print_message('Setting REQUESTS_MEMORY to ' + requests_memory)
-yaml = yaml.replace('${REQUESTS_MEMORY}', requests_memory)
-print_message('Setting LIMITS_MEMORY to ' + limits_memory)
-yaml = yaml.replace('${LIMITS_MEMORY}', limits_memory)
-print_message('Setting REQUESTS_CPU to ' + requests_cpu)
-yaml = yaml.replace('${REQUESTS_CPU}', requests_cpu)
-print_message('Setting LIMITS_CPU to ' + limits_cpu)
-yaml = yaml.replace('${LIMITS_CPU}', limits_cpu)
-print_message('Setting DEPLOYMENT_SUFFIX to ' + deployment_suffix)
-yaml = yaml.replace('${DEPLOYMENT_SUFFIX}', deployment_suffix)
-print_message('Setting LOAD_BALANCER_HOSTNAME to ' + load_balancer_hostname)
-yaml = yaml.replace('${LOAD_BALANCER_HOSTNAME}', load_balancer_hostname)
-if backend_protocol == 'https':
-    print_message('Setting KEYSTORE to ' + sdc_keystore)
-    yaml = yaml.replace('${KEYSTORE}', sdc_keystore)
-print_message('Setting BACKEND_PROTOCOL to ' + backend_protocol.upper())
-yaml = yaml.replace('${BACKEND_PROTOCOL}', backend_protocol.upper())
-
+yaml = replace_in_yaml(yaml, '${DEP_ID}', short_deployment_id)
+yaml = replace_in_yaml(yaml, '${NAMESPACE}', namespace)
+yaml = replace_in_yaml(yaml, '${SDC_VERSION}', config.get('SDC_VERSION'))
+yaml = replace_in_yaml(yaml, '${ORG_ID}', config.get('ORG_ID'))
+yaml = replace_in_yaml(yaml, '${SCH_URL}', config.get('SCH_URL'))
+yaml = replace_in_yaml(yaml, '${REQUESTS_MEMORY}', config.get('REQUESTS_MEMORY'))
+yaml = replace_in_yaml(yaml, '${LIMITS_MEMORY}', config.get('LIMITS_MEMORY'))
+yaml = replace_in_yaml(yaml, '${REQUESTS_CPU}', config.get('REQUESTS_CPU'))
+yaml = replace_in_yaml(yaml, '${LIMITS_CPU}', config.get('LIMITS_CPU'))
+yaml = replace_in_yaml(yaml, '${DEPLOYMENT_SUFFIX}', deployment_suffix)
+yaml = replace_in_yaml(yaml, '${SERVICE_TYPE}', config.get('SERVICE_TYPE'))
+yaml = replace_in_yaml(yaml, '${SERVICE_PORT}', config.get('SERVICE_PORT'))
+yaml = replace_in_yaml(yaml, '${LOAD_BALANCER_HOSTNAME}', config.get('LOAD_BALANCER_HOSTNAME'))
+yaml = replace_in_yaml(yaml, '${BACKEND_PROTOCOL}', config.get('BACKEND_PROTOCOL').upper())
+yaml = replace_in_yaml(yaml, '${KEYSTORE}', config.get('SDC_KEYSTORE'))
+print_message('---')
 
 # Assign the yaml to the deployment
 deployment.yaml = yaml
@@ -239,6 +199,8 @@ deployment.yaml = yaml
 # Update the deployment
 sch.update_deployment(deployment)
 
-# (Optional) Start the deployment
-# sch.start_deployment(deployment)
+# (Optional) Autostart the deployment
+#print_message('Starting the deployment...')
+#sch.start_deployment(deployment)
+
 print_message('Done')
